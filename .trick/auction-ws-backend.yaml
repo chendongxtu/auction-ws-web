@@ -1,0 +1,56 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: __DEPLOY_NAME__
+  labels:
+    app: dos-auction-ws
+    tier: backend
+    release: __RELEASE__
+spec:
+  replicas: __REPLICAS__
+  template:
+    metadata:
+      labels:
+        app: dos-auction-ws
+        tier: backend
+        release: __RELEASE__
+    spec:
+      containers:
+      - name: backend
+        image: __IMAGE__
+        env:
+        - name: FLASK_ENV
+          value: __DEPLOY_ENV__
+        ports:
+        - name: http
+          containerPort: 5000
+        volumeMounts:
+        - name: secret-configs
+          mountPath: /auction-ws-web/websocket/configs/secrets.py
+          subPath: secrets.py
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+            httpHeaders:
+            - name: Host
+              value: __PROBE_HOST__
+          initialDelaySeconds: 5
+          periodSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            httpHeaders:
+            - name: Host
+              value: __PROBE_HOST__
+          initialDelaySeconds: 10
+          periodSeconds: 2
+      volumes:
+      - name: secret-configs
+        secret:
+          secretName: auction-ws-backend
+          items:
+          - key: secrets.py
+            path: secrets.py
+

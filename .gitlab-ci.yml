@@ -1,0 +1,119 @@
+image: $CI_REGISTRY/build/python:3.5.3
+
+stages:
+  - test
+  - docker
+  - qatest
+  - canary
+  - production
+
+variables:
+  TEST_KUBE_REPLICAS: 1
+  TEST_KUBE_PROBE_HOST: auction.test.dos.cheanjia.net
+  PRODUCTION_KUBE_REPLICAS: 15
+  PRODUCTION_KUBE_PROBE_HOST: uca.lixinchuxing.com
+
+codestyle:
+  stage: test
+  script:
+    - pip3 install flake8
+    - flake8
+
+security:
+  stage: test
+  script:
+    - pip3 install bandit==1.4.0
+    - bandit -r websocket -lll
+
+unittest:
+  stage: test
+  services:
+    - pragkent/mysql:5.6
+    - redis:3.2.8-alpine
+
+  variables:
+    MYSQL_ROOT_PASSWORD: root
+    MYSQL_DATABASE: planx_test
+    MYSQL_USER: planx
+    MYSQL_PASSWORD: planx
+    SQLALCHEMY_DATABASE_URI: mysql+pymysql://planx:planx@pragkent-mysql/planx_test?charset=utf8mb4
+    REDIS_URL: redis://redis:6379/0
+    FLASK_ENV: unittest
+
+  cache:
+    paths:
+      - pip-cache
+
+  before_script:
+    - mkdir -p pip-cache
+    - pip install --cache-dir pip-cache -r requirements.txt
+
+  script:
+    - py.test tests
+
+docker:build:
+  stage: docker
+  before_script:
+    - export DOCKER_IMAGE_NAME=$([ "$CI_COMMIT_REF_NAME" == "master" ] && echo "${CI_PROJECT_NAME}" || echo "${CI_PROJECT_NAME}-test")
+    - export DOCKER_IMAGE=${CI_REGISTRY_IMAGE}/${DOCKER_IMAGE_NAME}:${CI_COMMIT_SHA:0:8}
+    - echo $DOCKER_IMAGE
+  script:
+    - docker build --build-arg GIT_COMMIT=${CI_COMMIT_SHA:0:8} -t $DOCKER_IMAGE .
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker push $DOCKER_IMAGE
+  only:
+    - branches
+  except:
+    - /^wip-.*$/
+
+qatest:deploy:
+  stage: qatest
+  image: cr.cheanjiait.com/build/trick:0.2
+  environment:
+    name: test
+    url: https://auction.test.dos.cheanjia.net
+  script:
+    - trick config init
+    - trick deploy auction-ws-backend
+  artifacts:
+    name: "kube-deploy.${CI_JOB_STAGE}"
+    paths:
+      - kube-deploy
+  dependencies: []
+  when: manual
+
+canary:deploy:
+  stage: canary
+  image: cr.cheanjiait.com/build/trick:0.2
+  environment:
+    name: production
+    url: https://ucwx.cheanjia.com
+  script:
+    - trick config init
+    - trick canary auction-ws-backend
+  artifacts:
+    name: "kube-deploy.${CI_JOB_STAGE}"
+    paths:
+      - kube-deploy
+  dependencies: []
+  when: manual
+  only:
+    - master
+
+production:deploy:
+  stage: production
+  image: cr.cheanjiait.com/build/trick:0.2
+  environment:
+    name: production
+    url: https://ucwx.cheanjia.com
+  script:
+    - trick config init
+    - trick deploy auction-ws-backend
+  artifacts:
+    name: "kube-deploy.${CI_JOB_STAGE}"
+    paths:
+      - kube-deploy
+  dependencies: []
+  when: manual
+  only:
+    - master
