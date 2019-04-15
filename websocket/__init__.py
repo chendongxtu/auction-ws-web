@@ -64,7 +64,8 @@ def create_app(config=None):
     CORS(app, supports_credentials=True)
     socketio.init_app(app=app, async_mode=async_mode,
                       message_queue=app.config['REDIS_URL'],
-                      channel='auction_car_info_broadcast')
+                      channel='auction_car_info_broadcast',
+                      engineio_logger=True)
 
     from .main  import main as blueprint_main
     app.register_blueprint(blueprint_main)

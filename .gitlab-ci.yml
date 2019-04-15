@@ -8,10 +8,10 @@ stages:
   - production
 
 variables:
-  TEST_KUBE_REPLICAS: 1
+  TEST_KUBE_REPLICAS: 3
   TEST_KUBE_PROBE_HOST: auction.test.dos.cheanjia.net
   PRODUCTION_KUBE_REPLICAS: 15
-  PRODUCTION_KUBE_PROBE_HOST: uca.lixinchuxing.com
+  PRODUCTION_KUBE_PROBE_HOST: ''
 
 codestyle:
   stage: test
@@ -36,7 +36,7 @@ unittest:
     MYSQL_DATABASE: planx_test
     MYSQL_USER: planx
     MYSQL_PASSWORD: planx
-    SQLALCHEMY_DATABASE_URI: mysql+pymysql://planx:planx@pragkent-mysql/planx_test?charset=utf8mb4
+    SQLALCHEMY_DATABASE_URI: ''
     REDIS_URL: redis://redis:6379/0
     FLASK_ENV: unittest
 
